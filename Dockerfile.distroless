@@ -6,15 +6,15 @@ RUN apk update && apk add --no-cache bash
 
 # Create application directories and copy JAR files
 WORKDIR /search-admin
-COPY Search-Admin/target/search-admin-3.0.6-SNAPSHOT.jar .
+COPY Search-Admin/target/search-admin-3.0.7-SNAPSHOT.jar .
 COPY Search-Admin/target/.env .
 
 WORKDIR /search-api
-COPY SmartSearchAPI/target/smart-search-api-3.0.6-SNAPSHOT.jar .
+COPY SmartSearchAPI/target/smart-search-api-3.0.7-SNAPSHOT.jar .
 COPY SmartSearchAPI/target/.env .
 
 WORKDIR /smart-search-util
-COPY SmartSearchUtilservice/target/smart-search-util-3.0.6-SNAPSHOT.jar .
+COPY SmartSearchUtilservice/target/smart-search-util-3.0.7-SNAPSHOT.jar .
 COPY SmartSearchUtilservice/target/.env .
 
 # Copy original orchestration script for reference
