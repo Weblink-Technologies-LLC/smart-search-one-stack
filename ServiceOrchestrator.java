@@ -31,6 +31,21 @@ public class ServiceOrchestrator {
             }));
             
             System.out.println("All services started. Waiting for processes...");
+            
+            boolean allRunning = true;
+            while (allRunning) {
+                Thread.sleep(1000); // Check every second
+                for (int i = 0; i < processes.size(); i++) {
+                    Process process = processes.get(i);
+                    if (!process.isAlive()) {
+                        String serviceName = (i == 0) ? "SEARCH-ADMIN" : (i == 1) ? "SEARCH-API" : "UTIL-SERVICES";
+                        System.err.println("ERROR: " + serviceName + " process exited with code: " + process.exitValue());
+                        allRunning = false;
+                        break;
+                    }
+                }
+            }
+            
             for (Process process : processes) {
                 process.waitFor();
             }
@@ -72,6 +87,14 @@ public class ServiceOrchestrator {
         
         Process process = pb.start();
         System.out.println(serviceName + " started with PID: " + process.pid());
+        
+        Thread.sleep(2000);
+        if (!process.isAlive()) {
+            System.err.println("WARNING: " + serviceName + " exited immediately with code: " + process.exitValue());
+            System.err.println("Check log file: " + logFile);
+        } else {
+            System.out.println(serviceName + " is running successfully");
+        }
         
         return process;
     }
