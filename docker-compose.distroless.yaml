@@ -12,49 +12,117 @@ services:
     volumes:
       - ./mongodata:/data/db
 
-  elasticsearch: 
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-local
     ports:
-      - ${ES_PORT}:${ES_PORT}
-    environment:
-      discovery.type: 'single-node'
-      cluster.name: ${CLUSTER_NAME}
-      xpack.security.enabled: 'true'
-      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      - "6380:6379"
+    volumes:
+      - ./redisdata:/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
     volumes:
       - ./esdata:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=elasticsearch
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - xpack.license.self_generated.type=basic
     mem_limit: ${MEM_LIMIT}
     ulimits:
       memlock:
         soft: -1
         hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
 
   smartsearch-distroless:
     depends_on: 
-      - elasticsearch
-      - mongodb
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
     build:
       context: .
       dockerfile: Dockerfile.distroless
     environment:
       - MONGODB_ADMIN_DATABASE=${MONGODB_ADMIN_DATABASE}
       - MONGODB_URI=${MONGODB_URI}
+      - SPRING_DATA_MONGODB_URI=${SPRING_DATA_MONGODB_URI}
+      - SPRING_DATA_MONGODB_DATABASE=${SPRING_DATA_MONGODB_DATABASE}
+      
       - INTERNAL_SEARCH_ENGINE_ENABLED=${INTERNAL_SEARCH_ENGINE_ENABLED}
       - INTERNAL_SEARCH_ENGINE_PASSWORD=${INTERNAL_SEARCH_ENGINE_PASSWORD}
       - INTERNAL_SEARCH_ENGINE_URL=${INTERNAL_SEARCH_ENGINE_URL}
       - INTERNAL_SEARCH_ENGINE_VERSION=${ELASTIC_VERSION}
+      - INTERNAL_SEARCH_ENGINE_TYPE=${INTERNAL_SEARCH_ENGINE_TYPE}
+      - INTERNAL_SEARCH_ENGINE_USERNAME=${INTERNAL_SEARCH_ENGINE_USERNAME}
+      
+      - SS_ADMIN_PORT=${SS_ADMIN_PORT}
+      - SS_API_PORT=${SS_API_PORT}
+      - SS_UTIL_PORT=${SS_UTIL_PORT}
+      
       - CACHE_TYPE=${CACHE_TYPE}
+      - SPRING_CACHE_TYPE=${SPRING_CACHE_TYPE}
+      
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_LIVE_TIME=${REDIS_LIVE_TIME}
+      
       - AWS_BUCKET=${AWS_BUCKET}
       - AWS_BUCKET_PREFIX=${AWS_BUCKET_PREFIX}
       - AWS_CREDENTIALS_ACCESS_KEY=${AWS_CREDENTIALS_ACCESS_KEY}
       - AWS_CREDENTIALS_SECRET_KEY=${AWS_CREDENTIALS_SECRET_KEY}
       - AWS_CREDENTIALS_REGION=${AWS_CREDENTIALS_REGION}
+      
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_EXPIRATION_TIME=${JWT_EXPIRATION_TIME}
+      
+      - PASSWORD_ENCRYPTION_SECRET_KEY=${PASSWORD_ENCRYPTION_SECRET_KEY}
       - PASSWORD_ENC_SECRET_KEY=${PASSWORD_ENC_SECRET_KEY}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_LIVE_TIME=${REDIS_LIVE_TIME}
+      - SMARTSEARCH_ENC_SECRET_KEY=${SMARTSEARCH_ENC_SECRET_KEY}
+      
+      - LICENSE_TYPE=${LICENSE_TYPE}
+      - LICENSE_PRODUCT_DATA=${LICENSE_PRODUCT_DATA}
+      - LICENSE_PRODUCT_ID=${LICENSE_PRODUCT_ID}
+      - LICENSE_KEY=${LICENSE_KEY}
+      - LICENSE_OFFLINE_ACTIVATION=${LICENSE_OFFLINE_ACTIVATION}
+      - LICENSE_ON_PREMISE_URL=${LICENSE_ON_PREMISE_URL}
+      - LICENSE_USER_ID=${LICENSE_USER_ID}
+      - LICENSE_USER_PLAN=${LICENSE_USER_PLAN}
+      - LICENSE_USER_PLAN_ID=${LICENSE_USER_PLAN_ID}
+      - LICENSE_USER_DEPLOYMENT_ID=${LICENSE_USER_DEPLOYMENT_ID}
+      - LICENSE_CRYPTLEX_SERVICE_URL=${LICENSE_CRYPTLEX_SERVICE_URL}
+      - LICENSE_CRYPTLEX_SERVICE_TOKEN=${LICENSE_CRYPTLEX_SERVICE_TOKEN}
+      
+      - APPLICATION_DEPLOYMENT_ID=${APPLICATION_DEPLOYMENT_ID}
+      - APPLICATION_CUSTOMER_ID=${APPLICATION_CUSTOMER_ID}
+      - APPLICATION_DEPLOYMENT_TYPE=${APPLICATION_DEPLOYMENT_TYPE}
+      
+      - MANAGEMENT_ENDPOINTS_ENABLED_BY_DEFAULT=${MANAGEMENT_ENDPOINTS_ENABLED_BY_DEFAULT}
+      - MANAGEMENT_ENDPOINT_HEALTH_ENABLED=${MANAGEMENT_ENDPOINT_HEALTH_ENABLED}
+      - MANAGEMENT_ENDPOINT_INFO_ENABLED=${MANAGEMENT_ENDPOINT_INFO_ENABLED}
+      - MANAGEMENT_ENDPOINT_METRICS_ENABLED=${MANAGEMENT_ENDPOINT_METRICS_ENABLED}
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE}
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED}
+      - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=${MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED}
+      - MANAGEMENT_HEALTH_REDIS_ENABLED=${MANAGEMENT_HEALTH_REDIS_ENABLED}
     ports:
       - 9080:9080
       - 9081:9081

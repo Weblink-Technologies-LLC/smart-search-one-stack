@@ -72,10 +72,23 @@ public class ServiceOrchestrator {
                     if (!line.isEmpty() && !line.startsWith("#") && line.contains("=")) {
                         String[] parts = line.split("=", 2);
                         if (parts.length == 2) {
-                            env.put(parts[0].trim(), parts[1].trim());
+                            String key = parts[0].trim();
+                            String value = parts[1].trim();
+                            if (value.startsWith("\"") && value.endsWith("\"")) {
+                                value = value.substring(1, value.length() - 1);
+                            }
+                            env.put(key, value);
+                            System.out.println("Set env var: " + key + " = " + (key.contains("SECRET") || key.contains("PASSWORD") ? "[HIDDEN]" : value));
                         }
                     }
                 }
+            }
+        }
+        
+        for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
+            if (entry.getKey().startsWith("LICENSE_") || entry.getKey().startsWith("APPLICATION_")) {
+                env.put(entry.getKey(), entry.getValue());
+                System.out.println("Added system env: " + entry.getKey() + " = " + (entry.getKey().contains("SECRET") ? "[HIDDEN]" : entry.getValue()));
             }
         }
         
