@@ -12,13 +12,13 @@ public class ServiceOrchestrator {
         List<Process> processes = new ArrayList<>();
         
         try {
-            Process adminProcess = startService("SEARCH-ADMIN", "/search-admin", "search-admin-3.0.6-SNAPSHOT.jar", "/tmp/ss-admin.log");
+            Process adminProcess = startService("SEARCH-ADMIN", "/search-admin", "search-admin-3.0.7-SNAPSHOT.jar", "/tmp/ss-admin.log");
             processes.add(adminProcess);
             
-            Process apiProcess = startService("SEARCH-API", "/search-api", "smart-search-api-3.0.6-SNAPSHOT.jar", "/tmp/ss-api.log");
+            Process apiProcess = startService("SEARCH-API", "/search-api", "smart-search-api-3.0.7-SNAPSHOT.jar", "/tmp/ss-api.log");
             processes.add(apiProcess);
             
-            Process utilProcess = startService("UTIL-SERVICES", "/smart-search-util", "smart-search-util-3.0.6-SNAPSHOT.jar", "/tmp/ss-utils.log");
+            Process utilProcess = startService("UTIL-SERVICES", "/smart-search-util", "smart-search-util-3.0.7-SNAPSHOT.jar", "/tmp/ss-utils.log");
             processes.add(utilProcess);
             
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
