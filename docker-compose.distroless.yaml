@@ -1,0 +1,38 @@
+version: '3'
+services:
+  elasticsearch: 
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    ports:
+      - ${ES_PORT}:${ES_PORT}
+    environment:
+      discovery.type: 'single-node'
+      cluster.name: ${CLUSTER_NAME}
+      xpack.security.enabled: 'true'
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+    volumes:
+      - ./esdata:/usr/share/elasticsearch/data
+    mem_limit: ${MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  smartsearch-distroless:
+    depends_on: 
+      - elasticsearch
+    build:
+      context: .
+      dockerfile: Dockerfile.distroless
+    environment:
+      - MONGODB_ADMIN_DATABASE=${MONGODB_ADMIN_DATABASE}
+      - MONGODB_URI=${MONGODB_URI}
+      - INTERNAL_SEARCH_ENGINE_ENABLED=${INTERNAL_SEARCH_ENGINE_ENABLED}
+      - INTERNAL_SEARCH_ENGINE_PASSWORD=${INTERNAL_SEARCH_ENGINE_PASSWORD}
+      - INTERNAL_SEARCH_ENGINE_URL=${INTERNAL_SEARCH_ENGINE_URL}
+      - INTERNAL_SEARCH_ENGINE_VERSION=${ELASTIC_VERSION}
+    ports:
+      - 9080:9080
+      - 9081:9081
+      - 9085:9085
+    volumes:
+      - ./logs:/tmp
