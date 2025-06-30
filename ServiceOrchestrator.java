@@ -62,6 +62,11 @@ public class ServiceOrchestrator {
     private static Process startService(String serviceName, String workDir, String jarFile, String logFile) throws Exception {
         System.out.println("Starting " + serviceName + "...");
         
+        if (serviceName.equals("SEARCH-ADMIN")) {
+            System.out.println("Waiting 10 seconds for Elasticsearch to be fully ready...");
+            Thread.sleep(10000);
+        }
+        
         Map<String, String> env = new HashMap<>(System.getenv());
         File envFile = new File(workDir + "/.env");
         if (envFile.exists()) {

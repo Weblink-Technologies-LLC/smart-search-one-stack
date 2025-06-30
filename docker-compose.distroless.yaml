@@ -20,77 +20,22 @@ services:
     volumes:
       - ./redisdata:/data
 
-  setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
-    volumes:
-      - certs:/usr/share/elasticsearch/config/certs
-    user: "0"
-    command: >
-      bash -c '
-        if [ x${ELASTIC_PASSWORD} == x ]; then
-          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
-          exit 1;
-        fi;
-        if [ ! -f config/certs/ca.zip ]; then
-          echo "Creating CA";
-          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
-          unzip config/certs/ca.zip -d config/certs;
-        fi;
-        if [ ! -f config/certs/certs.zip ]; then
-          echo "Creating certs";
-          echo -ne \
-          "instances:\n"\
-          "  - name: elasticsearch\n"\
-          "    dns:\n"\
-          "      - elasticsearch\n"\
-          "      - localhost\n"\
-          "    ip:\n"\
-          "      - 127.0.0.1\n"\
-          > config/certs/instances.yml;
-          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
-          unzip config/certs/certs.zip -d config/certs;
-        fi;
-        echo "Setting file permissions"
-        chown -R root:root config/certs;
-        find . -type d -exec chmod 750 \{\} \;;
-        find . -type f -exec chmod 640 \{\} \;;
-        echo "Waiting for Elasticsearch availability";
-        until curl -s --cacert config/certs/ca/ca.crt https://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
-        echo "All done!";
-      '
-    healthcheck:
-      test: ["CMD-SHELL", "[ -f config/certs/elasticsearch/elasticsearch.crt ]"]
-      interval: 1s
-      timeout: 5s
-      retries: 120
-
   elasticsearch:
-    depends_on:
-      setup:
-        condition: service_healthy
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
     volumes:
-      - certs:/usr/share/elasticsearch/config/certs
       - ./esdata:/usr/share/elasticsearch/data
     ports:
       - ${ES_PORT}:9200
     environment:
       - node.name=elasticsearch
       - cluster.name=${CLUSTER_NAME}
-      - cluster.initial_master_nodes=elasticsearch
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
       - xpack.security.enabled=true
-      - xpack.security.http.ssl.enabled=true
-      - xpack.security.http.ssl.key=certs/elasticsearch/elasticsearch.key
-      - xpack.security.http.ssl.certificate=certs/elasticsearch/elasticsearch.crt
-      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
-      - xpack.security.transport.ssl.enabled=true
-      - xpack.security.transport.ssl.key=certs/elasticsearch/elasticsearch.key
-      - xpack.security.transport.ssl.certificate=certs/elasticsearch/elasticsearch.crt
-      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
-      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
       - xpack.license.self_generated.type=basic
+      - discovery.type=single-node
     mem_limit: ${MEM_LIMIT}
     ulimits:
       memlock:
@@ -100,14 +45,14 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+          "curl -s http://localhost:9200 | grep -q 'missing authentication credentials'",
         ]
       interval: 10s
       timeout: 10s
       retries: 120
 
   smartsearch-distroless:
-    depends_on: 
+    depends_on:
       elasticsearch:
         condition: service_healthy
       mongodb:
@@ -123,40 +68,40 @@ services:
       - MONGODB_URI=${MONGODB_URI}
       - SPRING_DATA_MONGODB_URI=${SPRING_DATA_MONGODB_URI}
       - SPRING_DATA_MONGODB_DATABASE=${SPRING_DATA_MONGODB_DATABASE}
-      
+
       - INTERNAL_SEARCH_ENGINE_ENABLED=${INTERNAL_SEARCH_ENGINE_ENABLED}
       - INTERNAL_SEARCH_ENGINE_PASSWORD=${INTERNAL_SEARCH_ENGINE_PASSWORD}
       - INTERNAL_SEARCH_ENGINE_URL=${INTERNAL_SEARCH_ENGINE_URL}
       - INTERNAL_SEARCH_ENGINE_VERSION=${ELASTIC_VERSION}
       - INTERNAL_SEARCH_ENGINE_TYPE=${INTERNAL_SEARCH_ENGINE_TYPE}
       - INTERNAL_SEARCH_ENGINE_USERNAME=${INTERNAL_SEARCH_ENGINE_USERNAME}
-      
+
       - SS_ADMIN_PORT=${SS_ADMIN_PORT}
       - SS_API_PORT=${SS_API_PORT}
       - SS_UTIL_PORT=${SS_UTIL_PORT}
-      
+
       - CACHE_TYPE=${CACHE_TYPE}
       - SPRING_CACHE_TYPE=${SPRING_CACHE_TYPE}
-      
+
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_LIVE_TIME=${REDIS_LIVE_TIME}
-      
+
       - AWS_BUCKET=${AWS_BUCKET}
       - AWS_BUCKET_PREFIX=${AWS_BUCKET_PREFIX}
       - AWS_CREDENTIALS_ACCESS_KEY=${AWS_CREDENTIALS_ACCESS_KEY}
       - AWS_CREDENTIALS_SECRET_KEY=${AWS_CREDENTIALS_SECRET_KEY}
       - AWS_CREDENTIALS_REGION=${AWS_CREDENTIALS_REGION}
-      
+
       - JWT_SECRET=${JWT_SECRET}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_EXPIRATION_TIME=${JWT_EXPIRATION_TIME}
-      
+
       - PASSWORD_ENCRYPTION_SECRET_KEY=${PASSWORD_ENCRYPTION_SECRET_KEY}
       - PASSWORD_ENC_SECRET_KEY=${PASSWORD_ENC_SECRET_KEY}
       - SMARTSEARCH_ENC_SECRET_KEY=${SMARTSEARCH_ENC_SECRET_KEY}
-      
+
       - LICENSE_TYPE=${LICENSE_TYPE}
       - LICENSE_PRODUCT_DATA=${LICENSE_PRODUCT_DATA}
       - LICENSE_PRODUCT_ID=${LICENSE_PRODUCT_ID}
@@ -169,11 +114,11 @@ services:
       - LICENSE_USER_DEPLOYMENT_ID=${LICENSE_USER_DEPLOYMENT_ID}
       - LICENSE_CRYPTLEX_SERVICE_URL=${LICENSE_CRYPTLEX_SERVICE_URL}
       - LICENSE_CRYPTLEX_SERVICE_TOKEN=${LICENSE_CRYPTLEX_SERVICE_TOKEN}
-      
+
       - APPLICATION_DEPLOYMENT_ID=${APPLICATION_DEPLOYMENT_ID}
       - APPLICATION_CUSTOMER_ID=${APPLICATION_CUSTOMER_ID}
       - APPLICATION_DEPLOYMENT_TYPE=${APPLICATION_DEPLOYMENT_TYPE}
-      
+
       - MANAGEMENT_ENDPOINTS_ENABLED_BY_DEFAULT=${MANAGEMENT_ENDPOINTS_ENABLED_BY_DEFAULT}
       - MANAGEMENT_ENDPOINT_HEALTH_ENABLED=${MANAGEMENT_ENDPOINT_HEALTH_ENABLED}
       - MANAGEMENT_ENDPOINT_INFO_ENABLED=${MANAGEMENT_ENDPOINT_INFO_ENABLED}
@@ -182,16 +127,17 @@ services:
       - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED}
       - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=${MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED}
       - MANAGEMENT_HEALTH_REDIS_ENABLED=${MANAGEMENT_HEALTH_REDIS_ENABLED}
-      
+
       - CURATION_MAX_PROMOTED_COUNT=${CURATION_MAX_PROMOTED_COUNT}
       - CURATION_MAX_HIDDEN_COUNT=${CURATION_MAX_HIDDEN_COUNT}
-      
-      - REPORTS_ELASTIC_API_KEY=${REPORTS_ELASTIC_API_KEY}
-      - REPORTS_ELASTIC_AUTH_TYPE=${REPORTS_ELASTIC_AUTH_TYPE}
-      - REPORTS_ELASTIC_INDEX_NAME=${REPORTS_ELASTIC_INDEX_NAME}
-      - REPORTS_ELASTIC_PASSWORD=${REPORTS_ELASTIC_PASSWORD}
-      - REPORTS_ELASTIC_URL=${REPORTS_ELASTIC_URL}
-      - REPORTS_ELASTIC_USERNAME=${REPORTS_ELASTIC_USERNAME}
+
+      - REPORTS_ENGINE_TYPE=${REPORTS_ENGINE_TYPE}
+      - REPORTS_ENGINE_AUTH_TYPE=${REPORTS_ENGINE_AUTH_TYPE}
+      - REPORTS_ENGINE_URL=${REPORTS_ENGINE_URL}
+      - REPORTS_ENGINE_USERNAME=${REPORTS_ENGINE_USERNAME}
+      - REPORTS_ENGINE_PASSWORD=${REPORTS_ENGINE_PASSWORD}
+      - REPORTS_ENGINE_API_KEY=${REPORTS_ENGINE_API_KEY}
+      - REPORTS_ENGINE_INDEX_NAME=${REPORTS_ENGINE_INDEX_NAME}
       
       - AUDIT_LOG_API_KEY=${AUDIT_LOG_API_KEY}
       - AUDIT_LOG_AUTH_TYPE=${AUDIT_LOG_AUTH_TYPE}
@@ -199,12 +145,12 @@ services:
       - AUDIT_LOG_INDEX_NAME=${AUDIT_LOG_INDEX_NAME}
       - AUDIT_LOG_PASSWORD=${AUDIT_LOG_PASSWORD}
       - AUDIT_LOG_USERNAME=${AUDIT_LOG_USERNAME}
-      
+
       - LOGBACK_PROFILE=${LOGBACK_PROFILE}
       - LOGGING_DOC_ID_LIMIT=${LOGGING_DOC_ID_LIMIT}
       - LOGGING_MAX_HISTORY_DAYS=${LOGGING_MAX_HISTORY_DAYS}
       - LOGGING_QUERY_DSL=${LOGGING_QUERY_DSL}
-      
+
       - ELASTIC_ILM_POLICY_ALIAS_NAME=${ELASTIC_ILM_POLICY_ALIAS_NAME}
       - ELASTIC_ILM_POLICY_MAX_AGE=${ELASTIC_ILM_POLICY_MAX_AGE}
       - ELASTIC_ILM_POLICY_MIN_AGE=${ELASTIC_ILM_POLICY_MIN_AGE}
@@ -212,49 +158,49 @@ services:
       - ELASTIC_ILM_POLICY_PRIORITY=${ELASTIC_ILM_POLICY_PRIORITY}
       - ELASTIC_ILM_POLICY_TEMPLATE_INDEX_PATTERN=${ELASTIC_ILM_POLICY_TEMPLATE_INDEX_PATTERN}
       - ELASTIC_ILM_POLICY_TEMPLATE_NAME=${ELASTIC_ILM_POLICY_TEMPLATE_NAME}
-      
+
       - ELASTIC_PRIVILEGES_ENABLE=${ELASTIC_PRIVILEGES_ENABLE}
       - ELASTIC_MIGRATION_LOAD_MASTER_TEMPLATE=${ELASTIC_MIGRATION_LOAD_MASTER_TEMPLATE}
       - ELASTIC_MIGRATION_LOAD_RANKING_TEMPLATE=${ELASTIC_MIGRATION_LOAD_RANKING_TEMPLATE}
       - ELASTIC_MIGRATION_LOAD_PRECISION_TEMPLATE=${ELASTIC_MIGRATION_LOAD_PRECISION_TEMPLATE}
-      
+
       - SEARCH_API_URL=${SEARCH_API_URL}
       - GATEWAY_API_URL=${GATEWAY_API_URL}
-      
+
       - AUTH0_PUBLIC_KEY=${AUTH0_PUBLIC_KEY}
       - REACT_APP_AUTH0_CLIENT_ID=${REACT_APP_AUTH0_CLIENT_ID}
       - REACT_APP_AUTH0_DOMAIN=${REACT_APP_AUTH0_DOMAIN}
-      
+
       - SAAS_UI_URL=${SAAS_UI_URL}
       - SMART_SEARCH_API_KEY=${SMART_SEARCH_API_KEY}
       - SMART_SEARCH_SAAS_URL=${SMART_SEARCH_SAAS_URL}
       - SAAS_AMBERFLO_INGEST_DEPLOYMENT_METER_ENABLED=${SAAS_AMBERFLO_INGEST_DEPLOYMENT_METER_ENABLED}
-      
+
       - ART_BASE_URL=${ART_BASE_URL}
       - ART_INTERNAL=${ART_INTERNAL}
       - ART_REDIS_HOST=${ART_REDIS_HOST}
       - ART_REDIS_PORT=${ART_REDIS_PORT}
       - ART_METARANK_URL=${ART_METARANK_URL}
-      
+
       - ML_QUERY_EXPANSION_URL=${ML_QUERY_EXPANSION_URL}
       - ML_QUERY_EXPANSION_TOKEN=${ML_QUERY_EXPANSION_TOKEN}
       - ML_INFERENCE_TOKEN=${ML_INFERENCE_TOKEN}
-      
+
       - HUGGING_FACE_API_TOKEN=${HUGGING_FACE_API_TOKEN}
       - OPEN_AI_API_TOKEN=${OPEN_AI_API_TOKEN}
       - IPINFO_TOKEN=${IPINFO_TOKEN}
-      
+
       - CONVERSATIONAL_API_KEY=${CONVERSATIONAL_API_KEY}
       - CONVERSATIONAL_API_URL=${CONVERSATIONAL_API_URL}
       - CONVERSATIONAL_INDEX=${CONVERSATIONAL_INDEX}
       - CONVERSATIONAL_HISTORY_INDEX=${CONVERSATIONAL_HISTORY_INDEX}
-      
+
       - ACTUATOR_DEFAULT_ENABLED=${ACTUATOR_DEFAULT_ENABLED}
       - ACTUATOR_ENDPOINT_ALLOWED=${ACTUATOR_ENDPOINT_ALLOWED}
       - ACTUATOR_HEALTH_ENABLED=${ACTUATOR_HEALTH_ENABLED}
       - ACTUATOR_INFO_ENABLED=${ACTUATOR_INFO_ENABLED}
       - ACTUATOR_METRICS_ENABLED=${ACTUATOR_METRICS_ENABLED}
-      
+
       - AMBERFLO_ENABLED=${AMBERFLO_ENABLED}
       - AMBERFLO_API_KEY=${AMBERFLO_API_KEY}
       - AMBERFLO_SINGLE_PROJECT_ENABLED=${AMBERFLO_SINGLE_PROJECT_ENABLED}
@@ -277,7 +223,7 @@ services:
       - AMBERFLO_PRODUCT_ID=${AMBERFLO_PRODUCT_ID}
       - AMBERFLO_PRODUCT_PLAN_ID=${AMBERFLO_PRODUCT_PLAN_ID}
       - AMBERFLO_SECRET_KEY_TOKEN=${AMBERFLO_SECRET_KEY_TOKEN}
-      
+
       - APM_ENABLED=${APM_ENABLED}
       - APM_ENABLED_API=${APM_ENABLED_API}
       - APM_ENVIRONMENT_API=${APM_ENVIRONMENT_API}
@@ -292,7 +238,7 @@ services:
       - APM_ENVIRONMENT_AMBERFLO=${APM_ENVIRONMENT_AMBERFLO}
       - APM_LOG_LEVEL_AMBERFLO=${APM_LOG_LEVEL_AMBERFLO}
       - APM_LOG_SENDING_AMBERFLO=${APM_LOG_SENDING_AMBERFLO}
-      
+
       - DEFAULT_USERS=${DEFAULT_USERS}
       - DEFAULT_INDEX_DOCUMENT_LIMIT=${DEFAULT_INDEX_DOCUMENT_LIMIT}
       - DATA_MANAGEMENT_MAX_FILE_SIZE=${DATA_MANAGEMENT_MAX_FILE_SIZE}
@@ -302,11 +248,17 @@ services:
       - MONGOCK_ENABLED=${MONGOCK_ENABLED}
       - SAAS_ENABLED=${SAAS_ENABLED}
       - ART_ENABLED=${ART_ENABLED}
-      
+
       - CDC_ENABLED=${CDC_ENABLED}
       - CDC_DETECTOR_BASE_URL=${CDC_DETECTOR_BASE_URL}
       - CDC_EXECUTOR_BASE_URL=${CDC_EXECUTOR_BASE_URL}
       - CDC_ENCODER_BASE_URL=${CDC_ENCODER_BASE_URL}
+
+      - ELASTICSEARCH_SSL_CERTIFICATE_AUTHORITIES=${ELASTICSEARCH_SSL_CERTIFICATE_AUTHORITIES}
+      - ELASTICSEARCH_SSL_VERIFICATION_MODE=${ELASTICSEARCH_SSL_VERIFICATION_MODE}
+      - ELASTICSEARCH_SSL_ENABLED=${ELASTICSEARCH_SSL_ENABLED}
+      - ELASTICSEARCH_SSL_TRUSTSTORE_PATH=${ELASTICSEARCH_SSL_TRUSTSTORE_PATH}
+      - ELASTICSEARCH_SSL_TRUSTSTORE_TYPE=${ELASTICSEARCH_SSL_TRUSTSTORE_TYPE}
     ports:
       - 9080:9080
       - 9081:9081
@@ -315,5 +267,5 @@ services:
       - ./logs:/tmp
 
 volumes:
-  certs:
+  esdata:
     driver: local
