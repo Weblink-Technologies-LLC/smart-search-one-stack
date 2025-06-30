@@ -20,9 +20,57 @@ services:
     volumes:
       - ./redisdata:/data
 
-  elasticsearch:
+  setup:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
     volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        if [ x${ELASTIC_PASSWORD} == x ]; then
+          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+          exit 1;
+        fi;
+        if [ ! -f config/certs/ca.zip ]; then
+          echo "Creating CA";
+          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+          unzip config/certs/ca.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/certs.zip ]; then
+          echo "Creating certs";
+          echo -ne \
+          "instances:\n"\
+          "  - name: elasticsearch\n"\
+          "    dns:\n"\
+          "      - elasticsearch\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          > config/certs/instances.yml;
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip config/certs/certs.zip -d config/certs;
+        fi;
+        echo "Setting file permissions"
+        chown -R root:root config/certs;
+        find . -type d -exec chmod 750 \{\} \;;
+        find . -type f -exec chmod 640 \{\} \;;
+        echo "Waiting for Elasticsearch availability";
+        until curl -s --cacert config/certs/ca/ca.crt https://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+        echo "All done!";
+      '
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f config/certs/elasticsearch/elasticsearch.crt ]"]
+      interval: 1s
+      timeout: 5s
+      retries: 120
+
+  elasticsearch:
+    depends_on:
+      setup:
+        condition: service_healthy
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
       - ./esdata:/usr/share/elasticsearch/data
     ports:
       - ${ES_PORT}:9200
@@ -30,8 +78,18 @@ services:
       - node.name=elasticsearch
       - cluster.name=${CLUSTER_NAME}
       - cluster.initial_master_nodes=elasticsearch
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/elasticsearch/elasticsearch.key
+      - xpack.security.http.ssl.certificate=certs/elasticsearch/elasticsearch.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/elasticsearch/elasticsearch.key
+      - xpack.security.transport.ssl.certificate=certs/elasticsearch/elasticsearch.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
       - xpack.license.self_generated.type=basic
     mem_limit: ${MEM_LIMIT}
     ulimits:
@@ -42,7 +100,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
         ]
       interval: 10s
       timeout: 10s
@@ -61,6 +119,7 @@ services:
       dockerfile: Dockerfile.distroless
     environment:
       - MONGODB_ADMIN_DATABASE=${MONGODB_ADMIN_DATABASE}
+      - MONGODB_ELASTICSI_ADMIN_DATABASE=${MONGODB_ELASTICSI_ADMIN_DATABASE}
       - MONGODB_URI=${MONGODB_URI}
       - SPRING_DATA_MONGODB_URI=${SPRING_DATA_MONGODB_URI}
       - SPRING_DATA_MONGODB_DATABASE=${SPRING_DATA_MONGODB_DATABASE}
@@ -154,6 +213,48 @@ services:
       - ELASTIC_ILM_POLICY_TEMPLATE_INDEX_PATTERN=${ELASTIC_ILM_POLICY_TEMPLATE_INDEX_PATTERN}
       - ELASTIC_ILM_POLICY_TEMPLATE_NAME=${ELASTIC_ILM_POLICY_TEMPLATE_NAME}
       
+      - ELASTIC_PRIVILEGES_ENABLE=${ELASTIC_PRIVILEGES_ENABLE}
+      - ELASTIC_MIGRATION_LOAD_MASTER_TEMPLATE=${ELASTIC_MIGRATION_LOAD_MASTER_TEMPLATE}
+      - ELASTIC_MIGRATION_LOAD_RANKING_TEMPLATE=${ELASTIC_MIGRATION_LOAD_RANKING_TEMPLATE}
+      - ELASTIC_MIGRATION_LOAD_PRECISION_TEMPLATE=${ELASTIC_MIGRATION_LOAD_PRECISION_TEMPLATE}
+      
+      - SEARCH_API_URL=${SEARCH_API_URL}
+      - GATEWAY_API_URL=${GATEWAY_API_URL}
+      
+      - AUTH0_PUBLIC_KEY=${AUTH0_PUBLIC_KEY}
+      - REACT_APP_AUTH0_CLIENT_ID=${REACT_APP_AUTH0_CLIENT_ID}
+      - REACT_APP_AUTH0_DOMAIN=${REACT_APP_AUTH0_DOMAIN}
+      
+      - SAAS_UI_URL=${SAAS_UI_URL}
+      - SMART_SEARCH_API_KEY=${SMART_SEARCH_API_KEY}
+      - SMART_SEARCH_SAAS_URL=${SMART_SEARCH_SAAS_URL}
+      - SAAS_AMBERFLO_INGEST_DEPLOYMENT_METER_ENABLED=${SAAS_AMBERFLO_INGEST_DEPLOYMENT_METER_ENABLED}
+      
+      - ART_BASE_URL=${ART_BASE_URL}
+      - ART_INTERNAL=${ART_INTERNAL}
+      - ART_REDIS_HOST=${ART_REDIS_HOST}
+      - ART_REDIS_PORT=${ART_REDIS_PORT}
+      - ART_METARANK_URL=${ART_METARANK_URL}
+      
+      - ML_QUERY_EXPANSION_URL=${ML_QUERY_EXPANSION_URL}
+      - ML_QUERY_EXPANSION_TOKEN=${ML_QUERY_EXPANSION_TOKEN}
+      - ML_INFERENCE_TOKEN=${ML_INFERENCE_TOKEN}
+      
+      - HUGGING_FACE_API_TOKEN=${HUGGING_FACE_API_TOKEN}
+      - OPEN_AI_API_TOKEN=${OPEN_AI_API_TOKEN}
+      - IPINFO_TOKEN=${IPINFO_TOKEN}
+      
+      - CONVERSATIONAL_API_KEY=${CONVERSATIONAL_API_KEY}
+      - CONVERSATIONAL_API_URL=${CONVERSATIONAL_API_URL}
+      - CONVERSATIONAL_INDEX=${CONVERSATIONAL_INDEX}
+      - CONVERSATIONAL_HISTORY_INDEX=${CONVERSATIONAL_HISTORY_INDEX}
+      
+      - ACTUATOR_DEFAULT_ENABLED=${ACTUATOR_DEFAULT_ENABLED}
+      - ACTUATOR_ENDPOINT_ALLOWED=${ACTUATOR_ENDPOINT_ALLOWED}
+      - ACTUATOR_HEALTH_ENABLED=${ACTUATOR_HEALTH_ENABLED}
+      - ACTUATOR_INFO_ENABLED=${ACTUATOR_INFO_ENABLED}
+      - ACTUATOR_METRICS_ENABLED=${ACTUATOR_METRICS_ENABLED}
+      
       - AMBERFLO_ENABLED=${AMBERFLO_ENABLED}
       - AMBERFLO_API_KEY=${AMBERFLO_API_KEY}
       - AMBERFLO_SINGLE_PROJECT_ENABLED=${AMBERFLO_SINGLE_PROJECT_ENABLED}
@@ -201,9 +302,18 @@ services:
       - MONGOCK_ENABLED=${MONGOCK_ENABLED}
       - SAAS_ENABLED=${SAAS_ENABLED}
       - ART_ENABLED=${ART_ENABLED}
+      
+      - CDC_ENABLED=${CDC_ENABLED}
+      - CDC_DETECTOR_BASE_URL=${CDC_DETECTOR_BASE_URL}
+      - CDC_EXECUTOR_BASE_URL=${CDC_EXECUTOR_BASE_URL}
+      - CDC_ENCODER_BASE_URL=${CDC_ENCODER_BASE_URL}
     ports:
       - 9080:9080
       - 9081:9081
       - 9085:9085
     volumes:
       - ./logs:/tmp
+
+volumes:
+  certs:
+    driver: local
