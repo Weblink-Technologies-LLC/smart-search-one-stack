@@ -1,0 +1,29 @@
+# Environment files with sensitive data
+.env.secrets
+.env.local
+.env.backup
+.env
+
+# Docker volumes and data
+esdata/
+mongodata/
+redisdata/
+logs/
+
+# Build artifacts
+Search-Admin/target/
+SmartSearchAPI/target/
+SmartSearchUtilservice/target/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
