@@ -28,6 +28,52 @@ This project packages three Java microservices into a single distroless Docker c
 
 ### Using Pre-built Images
 
+#### One-Command Full Stack Deployment (Recommended)
+
+For first-time developers who want to try Smart Search One Stack without creating any files:
+
+```bash
+docker network create smartsearch-net 2>/dev/null || true && \
+docker run -d --name elasticsearch --network smartsearch-net \
+  -e "discovery.type=single-node" \
+  -e "ELASTIC_PASSWORD=Cu5BAieKx8cpD4q" \
+  -e "xpack.security.enabled=true" \
+  -e "xpack.security.http.ssl.enabled=false" \
+  -p 9200:9200 \
+  docker.elastic.co/elasticsearch/elasticsearch:8.14.3 && \
+docker run -d --name mongodb --network smartsearch-net \
+  -e "MONGO_INITDB_ROOT_USERNAME=admin" \
+  -e "MONGO_INITDB_ROOT_PASSWORD=adminpass" \
+  -e "MONGO_INITDB_DATABASE=ss-test-onestack" \
+  -p 27018:27017 \
+  mongo:7.0 && \
+docker run -d --name redis --network smartsearch-net \
+  -p 6380:6379 \
+  redis:7.2-alpine && \
+sleep 30 && \
+docker run -d --name smartsearch --network smartsearch-net \
+  -e "MONGODB_URI=mongodb://admin:adminpass@mongodb:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority" \
+  -e "ELASTIC_PASSWORD=Cu5BAieKx8cpD4q" \
+  -e "INTERNAL_SEARCH_ENGINE_URL=http://elasticsearch:9200" \
+  -e "INTERNAL_SEARCH_ENGINE_USERNAME=elastic" \
+  -e "INTERNAL_SEARCH_ENGINE_PASSWORD=Cu5BAieKx8cpD4q" \
+  -p 9080:9080 -p 9081:9081 -p 9085:9085 \
+  weblinktechs2021/ss-one-stack:secure-latest
+```
+
+**Access URLs:**
+- **Admin Interface**: http://localhost:9080/auth/
+- **API Documentation**: http://localhost:9081/swagger-ui.html
+
+**Cleanup:**
+```bash
+docker stop smartsearch elasticsearch mongodb redis
+docker rm smartsearch elasticsearch mongodb redis
+docker network rm smartsearch-net
+```
+
+#### Docker Compose Deployment
+
 ```bash
 # Pull the latest secure image
 docker pull weblinktechs2021/ss-one-stack:secure-latest
