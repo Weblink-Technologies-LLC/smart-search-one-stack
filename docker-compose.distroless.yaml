@@ -1,4 +1,14 @@
-version: '3'
+version: '3.8'
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  license_product_data:
+    file: ./secrets/license_product_data.txt
+  aws_secret_key:
+    file: ./secrets/aws_secret_key.txt
+  password_encryption_key:
+    file: ./secrets/password_encryption_key.txt
+
 services:
   mongodb:
     image: mongo:7.0
@@ -67,6 +77,11 @@ services:
       - .env.secrets
     environment:
       - NODE_ENV=production
+    secrets:
+      - jwt_secret
+      - license_product_data
+      - aws_secret_key
+      - password_encryption_key
     ports:
       - 9080:9080
       - 9081:9081

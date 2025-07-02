@@ -4,6 +4,9 @@
 .env.backup
 .env
 
+# Docker secrets
+secrets/
+
 # Docker volumes and data
 esdata/
 mongodata/
