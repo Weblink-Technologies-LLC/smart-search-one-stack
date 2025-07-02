@@ -1,0 +1,47 @@
+# Multi-stage build for Smart Search One Stack with Distroless
+FROM amazoncorretto:21-alpine3.19-jdk AS build
+
+# Install necessary build tools
+RUN apk update && apk add --no-cache bash
+
+# Create application directories and copy JAR files
+WORKDIR /search-admin
+COPY Search-Admin/target/search-admin-3.0.7-SNAPSHOT.jar .
+COPY Search-Admin/target/.env .
+
+WORKDIR /search-api
+COPY SmartSearchAPI/target/smart-search-api-3.0.7-SNAPSHOT.jar .
+COPY SmartSearchAPI/target/.env .
+
+WORKDIR /smart-search-util
+COPY SmartSearchUtilservice/target/smart-search-util-3.0.7-SNAPSHOT.jar .
+COPY SmartSearchUtilservice/target/.env .
+
+# Copy original orchestration script for reference
+WORKDIR /
+COPY ss-api.sh .
+
+# Copy and compile the Java-based orchestrator that mimics ss-api.sh behavior
+COPY ServiceOrchestrator.java .
+RUN javac ServiceOrchestrator.java
+
+# Production stage with distroless
+FROM gcr.io/distroless/java21-debian12
+
+# Copy application files from build stage
+COPY --from=build /search-admin /search-admin/
+COPY --from=build /search-api /search-api/
+COPY --from=build /smart-search-util /smart-search-util/
+COPY --from=build /ServiceOrchestrator.class /
+
+# Set working directory
+WORKDIR /
+
+# Set JVM options for optimal performance
+ENV JAVA_OPTS='-server -Dnetworkaddress.cache.ttl=5 -Dsun.misc.URLClassPath.disableJarChecking=true -XX:+UseG1GC -XX:MaxRAMPercentage=75'
+
+# Expose the same ports as original
+EXPOSE 9080 9081 9085
+
+# Run the Java orchestrator (replaces CMD ["./ss-api.sh"])
+ENTRYPOINT ["java", "ServiceOrchestrator"]
