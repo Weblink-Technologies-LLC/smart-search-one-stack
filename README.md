@@ -26,6 +26,73 @@ This project packages three Java microservices into a single distroless Docker c
 - Java 21 (for building from source)
 - Maven 3.6+ (for building from source)
 
+### Quick Setup for Docker Compose
+
+Before running docker-compose, create the required .env.secrets file:
+
+```bash
+# Create .env.secrets file with demo credentials for testing
+cat > .env.secrets << 'EOF'
+# Elasticsearch Passwords
+ELASTIC_PASSWORD=Cu5BAieKx8cpD4q
+INTERNAL_SEARCH_ENGINE_PASSWORD=Cu5BAieKx8cpD4q
+
+# MongoDB Connection (Internal Container)
+MONGODB_URI=mongodb://admin:adminpass@mongodb:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+SPRING_DATA_MONGODB_URI=mongodb://admin:adminpass@mongodb:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+
+# AWS Configuration (Demo values)
+AWS_BUCKET=smartsearch-data-migration
+AWS_BUCKET_PREFIX=demo-local
+AWS_CREDENTIALS_ACCESS_KEY=DEMO_ACCESS_KEY
+AWS_CREDENTIALS_REGION=us-east-2
+
+# JWT Configuration
+JWT_EXPIRATION_TIME=3600
+
+# License Configuration (Demo values)
+LICENSE_TYPE=properties
+LICENSE_PRODUCT_ID=demo-product-id
+LICENSE_KEY=DEMO-LICENSE-KEY
+LICENSE_OFFLINE_ACTIVATION=false
+LICENSE_ON_PREMISE_URL=
+LICENSE_USER_ID=demo-user-id
+LICENSE_USER_PLAN=STANDARD_WITH_NLP
+LICENSE_USER_PLAN_ID=
+LICENSE_USER_DEPLOYMENT_ID=demo-deployment
+LICENSE_CRYPTLEX_SERVICE_URL=https://demo.smartsearchcloud.com
+LICENSE_CRYPTLEX_SERVICE_TOKEN=demo-service-token
+
+# Application Deployment Configuration
+APPLICATION_DEPLOYMENT_ID=demo-deployment-id
+
+# Reports Engine Password
+REPORTS_ENGINE_PASSWORD=Cu5BAieKx8cpD4q
+REPORTS_PASSWORD=Cu5BAieKx8cpD4q
+
+# Audit Log Password
+AUDIT_LOG_PASSWORD=Cu5BAieKx8cpD4q
+
+# Auth0 Configuration (Demo values)
+AUTH0_PUBLIC_KEY=DEMO_PUBLIC_KEY
+REACT_APP_AUTH0_CLIENT_ID=demo-client-id
+
+# Smart Search API Key
+SMART_SEARCH_API_KEY=demo-api-key
+
+# Conversational Search Encryption Key
+SMARTSEARCH_ENC_SECRET_KEY=demo-encryption-key
+
+# Service API Key
+SS_SERVICE_API_KEY=demo-service-api-key
+EOF
+
+# Run the application
+docker-compose -f docker-compose.distroless.yaml up
+```
+
+**Note**: The above creates a .env.secrets file with demo credentials suitable for testing. For production use, replace with actual credentials.
+
 ### Using Pre-built Images
 
 #### One-Command Full Stack Deployment (Recommended)

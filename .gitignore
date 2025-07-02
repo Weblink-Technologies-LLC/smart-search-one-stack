@@ -4,8 +4,10 @@
 .env.backup
 .env
 
-# Docker secrets
+# Docker secrets (but allow example files and .gitkeep)
 secrets/
+!secrets/.gitkeep
+!.env.secrets.example
 
 # Docker volumes and data
 esdata/
