@@ -100,8 +100,8 @@ services:
       - INTERNAL_SEARCH_ENGINE_URL=http://elasticsearch-secure:9200
       - INTERNAL_SEARCH_ENGINE_USERNAME=elastic
       - INTERNAL_SEARCH_ENGINE_VERSION=8.14.3
-      - MONGODB_URI=mongodb://root:testpassword123@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
-      - SPRING_DATA_MONGODB_URI=mongodb://root:testpassword123@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://root:${MONGODB_ROOT_PASSWORD}@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+      - SPRING_DATA_MONGODB_URI=mongodb://root:${MONGODB_ROOT_PASSWORD}@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
       - MONGODB_ADMIN_DATABASE=ss-test-onestack
       - MONGODB_ELASTICSI_ADMIN_DATABASE=ss-test-onestack
       - SPRING_DATA_MONGODB_DATABASE=ss-test-onestack
