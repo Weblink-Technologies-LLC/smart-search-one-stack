@@ -72,6 +72,33 @@ docker rm smartsearch elasticsearch mongodb redis
 docker network rm smartsearch-net
 ```
 
+#### Secure Internal-Only Deployment (Recommended for Production)
+
+For maximum security with internal-only database access:
+
+```bash
+# One-command secure deployment
+./start-smartsearch-secure.sh
+```
+
+**Security Features:**
+- ✅ No external database ports exposed
+- ✅ Internal-only Docker networks
+- ✅ Auto-configured environment variables (no .env files required)
+- ✅ Container hardening (read-only filesystems, dropped capabilities)
+- ✅ Non-root container users
+- ✅ Auto-generating secrets for secure deployment
+
+**Access URLs:**
+- Admin Interface: http://localhost:9080/auth/
+- API Documentation: http://localhost:9081/swagger-ui.html
+- Utility Service: http://localhost:9085/actuator/health
+
+**Stop the secure stack:**
+```bash
+./stop-smartsearch-secure.sh
+```
+
 #### Docker Compose Deployment
 
 ```bash
