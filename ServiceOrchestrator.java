@@ -132,10 +132,12 @@ public class ServiceOrchestrator {
             elasticPassword = "Cu5BAieKx8cpD4q";
         }
         
-        System.out.println("Testing Elasticsearch connectivity at: " + elasticUrl);
+        System.out.println("🔍 Testing Elasticsearch connectivity at: " + elasticUrl);
+        System.out.println("   Using credentials: " + elasticUsername + " / " + (elasticPassword != null ? elasticPassword.substring(0, Math.min(4, elasticPassword.length())) + "..." : "null"));
         
-        int maxAttempts = 20;
+        int maxAttempts = 30;
         int attemptDelay = 3000; // 3 seconds between attempts
+        boolean elasticsearchReady = false;
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
@@ -147,24 +149,42 @@ public class ServiceOrchestrator {
                 connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
                 
                 connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
                 
                 int responseCode = connection.getResponseCode();
                 
                 if (responseCode == 200) {
-                    System.out.println("✅ Elasticsearch is ready and responding to health checks (HTTP " + responseCode + ")");
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                    reader.close();
                     
-                    System.out.println("Waiting additional 15 seconds for Elasticsearch internal readiness...");
-                    Thread.sleep(15000);
-                    return;
+                    String responseBody = response.toString();
+                    System.out.println("✅ Elasticsearch connectivity successful (attempt " + attempt + "/" + maxAttempts + ") - HTTP " + responseCode);
+                    System.out.println("   Cluster health response: " + responseBody.substring(0, Math.min(100, responseBody.length())) + "...");
+                    
+                    if (responseBody.contains("\"status\":\"green\"") || responseBody.contains("\"status\":\"yellow\"")) {
+                        System.out.println("✅ Elasticsearch cluster is healthy and ready for search-admin registration");
+                        elasticsearchReady = true;
+                        break;
+                    } else {
+                        System.out.println("⏳ Elasticsearch cluster not yet healthy, continuing to wait...");
+                    }
                 } else {
                     System.out.println("⏳ Elasticsearch not ready yet (attempt " + attempt + "/" + maxAttempts + ") - HTTP " + responseCode);
                 }
                 
                 connection.disconnect();
+            } catch (java.net.ConnectException e) {
+                System.out.println("⏳ Elasticsearch connection refused (attempt " + attempt + "/" + maxAttempts + ") - service not yet available");
+            } catch (java.net.UnknownHostException e) {
+                System.out.println("⏳ Elasticsearch hostname not resolved (attempt " + attempt + "/" + maxAttempts + ") - DNS not ready: " + e.getMessage());
             } catch (Exception e) {
-                System.out.println("⏳ Elasticsearch connectivity test failed (attempt " + attempt + "/" + maxAttempts + "): " + e.getMessage());
+                System.out.println("⏳ Elasticsearch connectivity test failed (attempt " + attempt + "/" + maxAttempts + "): " + e.getClass().getSimpleName() + " - " + e.getMessage());
             }
             
             if (attempt < maxAttempts) {
@@ -172,11 +192,50 @@ public class ServiceOrchestrator {
             }
         }
         
-        System.err.println("⚠️  WARNING: Elasticsearch did not become ready after " + maxAttempts + " attempts");
-        System.err.println("   Proceeding with search-admin startup, but it may fail during Elasticsearch registration");
-        System.err.println("   Total wait time: " + (maxAttempts * attemptDelay / 1000) + " seconds");
-        
-        System.out.println("Adding 30-second safety buffer for Elasticsearch readiness...");
-        Thread.sleep(30000);
+        if (elasticsearchReady) {
+            System.out.println("🔍 Performing additional Elasticsearch readiness verification...");
+            
+            for (int j = 1; j <= 5; j++) {
+                try {
+                    java.net.URL url = new java.net.URL(elasticUrl + "/_cat/indices");
+                    java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                    
+                    String auth = elasticUsername + ":" + elasticPassword;
+                    String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes());
+                    connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
+                    
+                    connection.setRequestMethod("GET");
+                    connection.setConnectTimeout(5000);
+                    connection.setReadTimeout(5000);
+                    
+                    int responseCode = connection.getResponseCode();
+                    if (responseCode == 200) {
+                        System.out.println("✅ Elasticsearch index operations ready (verification " + j + "/5)");
+                        break;
+                    } else {
+                        System.out.println("⏳ Waiting for index operations readiness... (verification " + j + "/5) - HTTP " + responseCode);
+                    }
+                    connection.disconnect();
+                } catch (Exception e) {
+                    System.out.println("⏳ Index operations test failed (verification " + j + "/5): " + e.getMessage());
+                }
+                
+                if (j < 5) {
+                    Thread.sleep(2000);
+                }
+            }
+            
+            System.out.println("⏳ Adding 25-second buffer for complete Elasticsearch internal readiness...");
+            Thread.sleep(25000);
+            System.out.println("✅ Elasticsearch is fully ready for search-admin service startup");
+        } else {
+            System.err.println("⚠️  WARNING: Elasticsearch did not become ready after " + maxAttempts + " attempts");
+            System.err.println("   Total wait time: " + (maxAttempts * attemptDelay / 1000) + " seconds");
+            System.err.println("   Proceeding with search-admin startup, but it may fail during Elasticsearch registration");
+            
+            System.out.println("⏳ Adding 45-second safety buffer for potential Elasticsearch readiness...");
+            Thread.sleep(45000);
+            System.out.println("⚠️  Search-admin startup proceeding despite Elasticsearch connectivity issues");
+        }
     }
 }
