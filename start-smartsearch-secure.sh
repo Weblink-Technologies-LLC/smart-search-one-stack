@@ -39,8 +39,11 @@ if [ ! -f secrets/mongodb_app_password.txt ]; then
 fi
 
 if [ ! -f secrets/elastic_password.txt ]; then
-    echo "🔑 Generating Elasticsearch password..."
-    openssl rand -base64 32 > secrets/elastic_password.txt
+    echo "🔑 Setting Elasticsearch password to default..."
+    echo "Cu5BAieKx8cpD4q" > secrets/elastic_password.txt
+else
+    echo "🔑 Setting Elasticsearch password to default for consistency..."
+    echo "Cu5BAieKx8cpD4q" > secrets/elastic_password.txt
 fi
 
 echo "✅ All secrets configured"
