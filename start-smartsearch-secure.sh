@@ -53,6 +53,11 @@ export AWS_CREDENTIALS_SECRET_KEY=$(cat secrets/aws_secret_key.txt)
 export AWS_CREDENTIALS_ACCESS_KEY="demo-access-key-for-testing-only"
 export SMARTSEARCH_ENC_SECRET_KEY="95bee83ac83f3193fe81b7bc75070fc4"
 
+echo "✅ Environment variables set:"
+echo "   ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:0:8}..."
+echo "   JWT_SECRET_KEY: ${JWT_SECRET_KEY:0:8}..."
+echo "   PASSWORD_ENCRYPTION_KEY: ${PASSWORD_ENCRYPTION_KEY:0:8}..."
+
 echo ""
 echo "🚀 STAGE 1: Starting infrastructure services..."
 echo "   📊 MongoDB (internal-only, no external access)"
