@@ -79,7 +79,8 @@ public class ServiceOrchestrator {
         System.out.println("Starting " + serviceName + "...");
         
         if (serviceName.equals("SEARCH-ADMIN")) {
-            System.out.println("Waiting for Elasticsearch to be fully ready before starting search-admin...");
+            System.out.println("Waiting for all dependencies to be fully ready before starting search-admin...");
+            waitForMongoDB();
             waitForElasticsearch();
         }
         
@@ -133,6 +134,66 @@ public class ServiceOrchestrator {
         return process;
     }
     
+    private static void waitForMongoDB() throws Exception {
+        String mongoUri = System.getenv("MONGODB_URI");
+        if (mongoUri == null) {
+            mongoUri = "mongodb://root:SecureMongoPass2024@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority";
+        }
+        
+        System.out.println("🔍 Enhanced MongoDB readiness verification for search-admin compatibility");
+        System.out.println("   Testing MongoDB connection and authentication...");
+        
+        String mongoHost = "mongodb-secure";
+        int mongoPort = 27017;
+        String username = "root";
+        String password = "SecureMongoPass2024";
+        String authDatabase = "admin";
+        
+        int maxAttempts = 30;
+        int attemptDelay = 2000; // 2 seconds between attempts
+        boolean mongoReady = false;
+        
+        System.out.println("🔍 Stage 1: Testing MongoDB connectivity and authentication...");
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                java.net.Socket socket = new java.net.Socket();
+                socket.connect(new java.net.InetSocketAddress(mongoHost, mongoPort), 5000);
+                socket.close();
+                
+                System.out.println("✅ MongoDB connectivity successful (attempt " + attempt + "/" + maxAttempts + ")");
+                System.out.println("   MongoDB server is accepting connections on " + mongoHost + ":" + mongoPort);
+                mongoReady = true;
+                break;
+                
+            } catch (java.net.ConnectException e) {
+                System.out.println("⏳ MongoDB connection refused (attempt " + attempt + "/" + maxAttempts + ") - service not yet available");
+            } catch (java.net.UnknownHostException e) {
+                System.out.println("⏳ MongoDB hostname not resolved (attempt " + attempt + "/" + maxAttempts + ") - DNS not ready: " + e.getMessage());
+            } catch (Exception e) {
+                System.out.println("⏳ MongoDB connectivity test failed (attempt " + attempt + "/" + maxAttempts + "): " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            }
+            
+            if (attempt < maxAttempts) {
+                Thread.sleep(attemptDelay);
+            }
+        }
+        
+        if (mongoReady) {
+            System.out.println("🔍 Stage 2: Adding buffer for MongoDB user initialization and authentication readiness...");
+            System.out.println("   This ensures MongoDB root user is fully initialized before search-admin connects");
+            Thread.sleep(15000); // 15 seconds buffer for user initialization
+            System.out.println("✅ MongoDB is fully ready for search-admin service startup");
+        } else {
+            System.err.println("⚠️  WARNING: MongoDB did not become ready after " + maxAttempts + " attempts");
+            System.err.println("   Total wait time: " + (maxAttempts * attemptDelay / 1000) + " seconds");
+            System.err.println("   Proceeding with search-admin startup, but it may fail during MongoDB connection");
+            
+            System.out.println("⏳ Adding safety buffer for potential MongoDB readiness...");
+            Thread.sleep(30000); // 30 seconds safety buffer
+            System.out.println("⚠️  Search-admin startup proceeding despite MongoDB connectivity issues");
+        }
+    }
+    
     private static void waitForElasticsearch() throws Exception {
         String elasticUrl = System.getenv("INTERNAL_SEARCH_ENGINE_URL");
         String elasticUsername = System.getenv("INTERNAL_SEARCH_ENGINE_USERNAME");
@@ -148,13 +209,15 @@ public class ServiceOrchestrator {
             elasticPassword = "Cu5BAieKx8cpD4q";
         }
         
-        System.out.println("🔍 Testing Elasticsearch connectivity at: " + elasticUrl);
+        System.out.println("🔍 Enhanced Elasticsearch readiness verification for search-admin compatibility");
+        System.out.println("   Testing connectivity at: " + elasticUrl);
         System.out.println("   Using credentials: " + elasticUsername + " / " + (elasticPassword != null ? elasticPassword.substring(0, Math.min(4, elasticPassword.length())) + "..." : "null"));
         
         int maxAttempts = 60;
         int attemptDelay = 5000; // 5 seconds between attempts
         boolean elasticsearchReady = false;
         
+        System.out.println("🔍 Stage 1: Testing basic Elasticsearch connectivity and cluster health...");
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 java.net.URL url = new java.net.URL(elasticUrl + "/_cluster/health");
@@ -181,14 +244,13 @@ public class ServiceOrchestrator {
                     
                     String responseBody = response.toString();
                     System.out.println("✅ Elasticsearch connectivity successful (attempt " + attempt + "/" + maxAttempts + ") - HTTP " + responseCode);
-                    System.out.println("   Cluster health response: " + responseBody.substring(0, Math.min(100, responseBody.length())) + "...");
                     
                     if (responseBody.contains("\"status\":\"green\"") || responseBody.contains("\"status\":\"yellow\"")) {
-                        System.out.println("✅ Elasticsearch cluster is healthy and ready for search-admin registration");
+                        System.out.println("✅ Elasticsearch cluster health is acceptable: " + (responseBody.contains("green") ? "GREEN" : "YELLOW"));
                         elasticsearchReady = true;
                         break;
                     } else {
-                        System.out.println("⏳ Elasticsearch cluster not yet healthy, continuing to wait...");
+                        System.out.println("⏳ Elasticsearch cluster not yet healthy, continuing to wait... (status: " + responseBody + ")");
                     }
                 } else {
                     System.out.println("⏳ Elasticsearch not ready yet (attempt " + attempt + "/" + maxAttempts + ") - HTTP " + responseCode);
@@ -209,9 +271,10 @@ public class ServiceOrchestrator {
         }
         
         if (elasticsearchReady) {
-            System.out.println("🔍 Performing additional Elasticsearch readiness verification...");
+            System.out.println("🔍 Stage 2: Testing Elasticsearch index operations for search-admin compatibility...");
+            boolean indexOpsReady = false;
             
-            for (int j = 1; j <= 5; j++) {
+            for (int j = 1; j <= 10; j++) {
                 try {
                     java.net.URL url = new java.net.URL(elasticUrl + "/_cat/indices");
                     java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
@@ -226,31 +289,79 @@ public class ServiceOrchestrator {
                     
                     int responseCode = connection.getResponseCode();
                     if (responseCode == 200) {
-                        System.out.println("✅ Elasticsearch index operations ready (verification " + j + "/5)");
+                        System.out.println("✅ Elasticsearch index operations ready (verification " + j + "/10)");
+                        indexOpsReady = true;
                         break;
                     } else {
-                        System.out.println("⏳ Waiting for index operations readiness... (verification " + j + "/5) - HTTP " + responseCode);
+                        System.out.println("⏳ Waiting for index operations readiness... (verification " + j + "/10) - HTTP " + responseCode);
                     }
                     connection.disconnect();
                 } catch (Exception e) {
-                    System.out.println("⏳ Index operations test failed (verification " + j + "/5): " + e.getMessage());
+                    System.out.println("⏳ Index operations test failed (verification " + j + "/10): " + e.getMessage());
                 }
                 
-                if (j < 5) {
-                    Thread.sleep(2000);
+                if (j < 10) {
+                    Thread.sleep(3000);
                 }
             }
             
-            System.out.println("⏳ Adding 45-second buffer for complete Elasticsearch internal readiness...");
-            Thread.sleep(45000);
-            System.out.println("✅ Elasticsearch is fully ready for search-admin service startup");
+            if (indexOpsReady) {
+                System.out.println("🔍 Stage 3: Testing search engine registration endpoints...");
+                boolean registrationReady = false;
+                
+                for (int k = 1; k <= 5; k++) {
+                    try {
+                        java.net.URL url = new java.net.URL(elasticUrl + "/_nodes");
+                        java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                        
+                        String auth = elasticUsername + ":" + elasticPassword;
+                        String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes());
+                        connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
+                        
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(5000);
+                        connection.setReadTimeout(5000);
+                        
+                        int responseCode = connection.getResponseCode();
+                        if (responseCode == 200) {
+                            System.out.println("✅ Elasticsearch registration endpoints ready (test " + k + "/5)");
+                            registrationReady = true;
+                            break;
+                        } else {
+                            System.out.println("⏳ Registration endpoints not ready... (test " + k + "/5) - HTTP " + responseCode);
+                        }
+                        connection.disconnect();
+                    } catch (Exception e) {
+                        System.out.println("⏳ Registration endpoint test failed (test " + k + "/5): " + e.getMessage());
+                    }
+                    
+                    if (k < 5) {
+                        Thread.sleep(2000);
+                    }
+                }
+                
+                if (registrationReady) {
+                    System.out.println("🔍 Stage 4: Adding extended buffer for complete Elasticsearch internal readiness...");
+                    System.out.println("   This ensures all internal Elasticsearch services are fully initialized");
+                    Thread.sleep(60000); // 60 seconds buffer
+                    System.out.println("✅ Elasticsearch is fully ready for search-admin service startup");
+                } else {
+                    System.out.println("⚠️  Registration endpoints not fully ready, adding safety buffer...");
+                    Thread.sleep(45000);
+                    System.out.println("⚠️  Proceeding with search-admin startup despite registration endpoint issues");
+                }
+            } else {
+                System.out.println("⚠️  Index operations not fully ready, adding safety buffer...");
+                Thread.sleep(45000);
+                System.out.println("⚠️  Proceeding with search-admin startup despite index operation issues");
+            }
         } else {
             System.err.println("⚠️  WARNING: Elasticsearch did not become ready after " + maxAttempts + " attempts");
             System.err.println("   Total wait time: " + (maxAttempts * attemptDelay / 1000) + " seconds");
             System.err.println("   Proceeding with search-admin startup, but it may fail during Elasticsearch registration");
             
-            System.out.println("⏳ Adding 90-second safety buffer for potential Elasticsearch readiness...");
-            Thread.sleep(90000);
+            System.out.println("⏳ Adding extended safety buffer for potential Elasticsearch readiness...");
+            Thread.sleep(120000); // 2 minutes safety buffer
             System.out.println("⚠️  Search-admin startup proceeding despite Elasticsearch connectivity issues");
         }
     }

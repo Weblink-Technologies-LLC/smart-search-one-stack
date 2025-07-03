@@ -106,14 +106,14 @@ fi
 
 echo ""
 echo "⏳ STAGE 4: Waiting for Elasticsearch to be ready..."
-echo "   Testing connectivity with enhanced checks for search-admin compatibility..."
+echo "   Enhanced connectivity checks for search-admin compatibility (60 attempts, 5-second intervals)"
 
 ELASTICSEARCH_READY=false
-for i in {1..30}; do
-    if curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" >/dev/null 2>&1; then
-        echo "✅ Elasticsearch basic connectivity successful (attempt $i/30)"
+for i in {1..60}; do
+    if docker exec elasticsearch-secure curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" >/dev/null 2>&1; then
+        echo "✅ Elasticsearch basic connectivity successful (attempt $i/60)"
         
-        HEALTH_STATUS=$(curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "unknown")
+        HEALTH_STATUS=$(docker exec elasticsearch-secure curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "unknown")
         echo "   Cluster health status: $HEALTH_STATUS"
         
         if [ "$HEALTH_STATUS" = "green" ] || [ "$HEALTH_STATUS" = "yellow" ]; then
@@ -124,9 +124,9 @@ for i in {1..30}; do
             echo "⏳ Waiting for cluster to reach healthy status... (current: $HEALTH_STATUS)"
         fi
     else
-        echo "⏳ Waiting for Elasticsearch basic connectivity... (attempt $i/30)"
+        echo "⏳ Waiting for Elasticsearch basic connectivity... (attempt $i/60)"
     fi
-    sleep 3
+    sleep 5
 done
 
 if [ "$ELASTICSEARCH_READY" = "true" ]; then
@@ -134,22 +134,38 @@ if [ "$ELASTICSEARCH_READY" = "true" ]; then
     echo "🔍 STAGE 4.5: Additional Elasticsearch readiness verification..."
     echo "   Ensuring internal search engine registration will succeed..."
     
-    for j in {1..5}; do
-        if curl -s -u "elastic:${ELASTIC_PASSWORD}" -X GET "http://localhost:9200/_cat/indices" >/dev/null 2>&1; then
-            echo "✅ Elasticsearch index operations ready (verification $j/5)"
+    for j in {1..10}; do
+        if docker exec elasticsearch-secure curl -s -u "elastic:${ELASTIC_PASSWORD}" -X GET "http://localhost:9200/_cat/indices" >/dev/null 2>&1; then
+            echo "✅ Elasticsearch index operations ready (verification $j/10)"
             break
         else
-            echo "⏳ Waiting for index operations readiness... (verification $j/5)"
+            echo "⏳ Waiting for index operations readiness... (verification $j/10)"
+            sleep 3
+        fi
+    done
+    
+    echo ""
+    echo "🔍 STAGE 4.6: Testing Elasticsearch authentication and API endpoints..."
+    for k in {1..5}; do
+        AUTH_TEST=$(docker exec elasticsearch-secure curl -s -u "elastic:${ELASTIC_PASSWORD}" -X GET "http://localhost:9200/_security/_authenticate" 2>/dev/null || echo "failed")
+        if echo "$AUTH_TEST" | grep -q "elastic"; then
+            echo "✅ Elasticsearch authentication verified (test $k/5)"
+            break
+        else
+            echo "⏳ Waiting for authentication readiness... (test $k/5)"
             sleep 2
         fi
     done
     
-    echo "⏳ Adding 20-second buffer for internal Elasticsearch readiness..."
-    sleep 20
+    echo "⏳ Adding 45-second buffer for complete internal Elasticsearch readiness..."
+    echo "   This ensures search-admin can successfully register the internal search engine"
+    sleep 45
     echo "✅ Elasticsearch is fully ready for search-admin service startup"
 else
-    echo "⚠️  WARNING: Elasticsearch did not reach healthy status after 90 seconds"
-    echo "   Proceeding with startup but search-admin may fail during registration"
+    echo "⚠️  WARNING: Elasticsearch did not reach healthy status after 300 seconds (5 minutes)"
+    echo "   This may cause search-admin to fail during internal search engine registration"
+    echo "   Adding 90-second safety buffer before proceeding..."
+    sleep 90
 fi
 
 echo ""
@@ -167,6 +183,7 @@ done
 echo ""
 echo "🎯 STAGE 6: Starting Smart Search Application..."
 echo "   Now that MongoDB authentication and Redis are confirmed working"
+echo "   Using updated ServiceOrchestrator with enhanced Elasticsearch timing"
 
 docker compose -f docker-compose.secure.yaml up -d smartsearch-secure
 
