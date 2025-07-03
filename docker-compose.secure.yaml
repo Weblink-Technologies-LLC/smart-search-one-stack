@@ -1,0 +1,307 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb-secure
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-adminpass}
+      MONGO_INITDB_DATABASE: ss-test-onestack
+    volumes:
+      - mongodata:/data/db
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-secure
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.3
+    container_name: elasticsearch-secure
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - node.name=elasticsearch-secure
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-Cu5BAieKx8cpD4q}
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -u elastic:${ELASTIC_PASSWORD:-Cu5BAieKx8cpD4q} -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  smartsearch-secure:
+    image: weblinktechs2021/dev-elasticsi-search-admin:community-0.0.10
+    container_name: smartsearch-secure
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - frontend
+      - backend
+    environment:
+      - ELASTIC_VERSION=8.14.3
+      - CLUSTER_NAME=docker-cluster
+      - ES_PORT=9200
+      - MEM_LIMIT=2147483648
+      - INTERNAL_SEARCH_ENGINE_ENABLED=true
+      - INTERNAL_SEARCH_ENGINE_PASSWORD=${ELASTIC_PASSWORD:-Cu5BAieKx8cpD4q}
+      - INTERNAL_SEARCH_ENGINE_TYPE=ELASTIC
+      - INTERNAL_SEARCH_ENGINE_URL=http://elasticsearch:9200
+      - INTERNAL_SEARCH_ENGINE_USERNAME=elastic
+      - INTERNAL_SEARCH_ENGINE_VERSION=8.14.3
+      - MONGODB_URI=mongodb://admin:${MONGODB_ROOT_PASSWORD:-adminpass}@mongodb:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+      - MONGODB_ADMIN_DATABASE=ss-test-onestack
+      - MONGODB_ELASTICSI_ADMIN_DATABASE=ss-test-onestack
+      - SPRING_DATA_MONGODB_DATABASE=ss-test-onestack
+      - SS_ADMIN_PORT=9080
+      - SS_API_PORT=9081
+      - SS_UTIL_PORT=9085
+      - CACHE_TYPE=simple
+      - SPRING_CACHE_TYPE=simple
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_LIVE_TIME=1800
+      - AWS_BUCKET=smartsearch-data-migration
+      - AWS_BUCKET_PREFIX=demo-local-testing
+      - AWS_CREDENTIALS_ACCESS_KEY=${AWS_CREDENTIALS_ACCESS_KEY:-demo-access-key-for-testing-only}
+      - AWS_CREDENTIALS_SECRET_KEY=${AWS_CREDENTIALS_SECRET_KEY:-demo-aws-secret-key-for-testing-only}
+      - AWS_CREDENTIALS_REGION=us-east-2
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-demo-jwt-secret-key-for-testing-only-32chars-long}
+      - JWT_EXPIRATION_TIME=3600
+      - PASSWORD_ENC_SECRET_KEY=${PASSWORD_ENCRYPTION_KEY:-demo-password-encryption-key-32chars-long-secure}
+      - LICENSE_TYPE=properties
+      - LICENSE_PRODUCT_ID=d2981e21-8fde-452f-923f-c1cd3494752a
+      - LICENSE_KEY=6F6D6B-04BBC3-42C89C-ED6648-2544E7-A1EAB1
+      - LICENSE_OFFLINE_ACTIVATION=false
+      - LICENSE_ON_PREMISE_URL=
+      - LICENSE_USER_ID=6311efff141df767e6a208b6
+      - LICENSE_USER_PLAN=STANDARD_WITH_NLP
+      - LICENSE_USER_PLAN_ID=
+      - LICENSE_USER_DEPLOYMENT_ID=2-kube
+      - LICENSE_CRYPTLEX_SERVICE_URL=https://cryptlex-esi-dev.smartsearchcloud.com
+      - LICENSE_CRYPTLEX_SERVICE_TOKEN=bb2aacc3-b47b-47f1-ad2a-7eafca5b251d
+      - APPLICATION_DEPLOYMENT_ID=64a7b682f0a3cda83a7a3d77
+      - APPLICATION_CUSTOMER_ID=TestDev
+      - APPLICATION_DEPLOYMENT_TYPE=enterprise
+      - CURATION_MAX_PROMOTED_COUNT=15
+      - CURATION_MAX_HIDDEN_COUNT=15
+      - REPORTS_ENGINE_TYPE=ELASTIC
+      - REPORTS_ENGINE_AUTH_TYPE=BASIC_AUTH
+      - REPORTS_ENGINE_URL=http://elasticsearch:9200
+      - REPORTS_ENGINE_USERNAME=elastic
+      - REPORTS_ENGINE_API_KEY=dummy
+      - REPORTS_ENGINE_INDEX_NAME=.elasticsi-analytics-api-logs
+      - REPORTS_ENGINE=ELASTIC
+      - REPORTS_AUTH_TYPE=BASIC_AUTH
+      - REPORTS_URL=http://elasticsearch:9200
+      - REPORTS_USERNAME=elastic
+      - REPORTS_API_KEY=dummy
+      - REPORTS_INDEX_NAME=.elasticsi-analytics-api-logs
+      - AUDIT_LOG_API_KEY=
+      - AUDIT_LOG_AUTH_TYPE=BASIC_AUTH
+      - AUDIT_LOG_HOST=http://elasticsearch:9200
+      - AUDIT_LOG_INDEX_NAME=smartsearch_audit_local
+      - AUDIT_LOG_USERNAME=elastic
+      - ELASTIC_ILM_POLICY_ALIAS_NAME=elasticsi-analytics-api-logs-policy
+      - ELASTIC_ILM_POLICY_MAX_AGE=30d
+      - ELASTIC_ILM_POLICY_MIN_AGE=180d
+      - ELASTIC_ILM_POLICY_NAME=elasticsi-analytics-ilm-policy
+      - ELASTIC_ILM_POLICY_PRIORITY=100
+      - ELASTIC_ILM_POLICY_TEMPLATE_INDEX_PATTERN=.elasticsi-analytics-api-logs*
+      - ELASTIC_ILM_POLICY_TEMPLATE_NAME=elasticsi-analytics-ilm-policy-template
+      - ELASTIC_PRIVILEGES_ENABLE=true
+      - ELASTIC_MIGRATION_LOAD_MASTER_TEMPLATE=true
+      - ELASTIC_MIGRATION_LOAD_RANKING_TEMPLATE=true
+      - ELASTIC_MIGRATION_LOAD_PRECISION_TEMPLATE=true
+      - SEARCH_API_URL=http://localhost:9081
+      - GATEWAY_API_URL=http://localhost:8080
+      - DEFAULT_USERS=*@weblinktechs.com,*@smartsearchtools.com,*@smartsearch.com,*@smartsearchcloud.com
+      - DEFAULT_ADMIN_USER=admin@weblinktechs.com
+      - DEFAULT_INDEX_DOCUMENT_LIMIT=5000
+      - LOGBACK_PROFILE=default
+      - LOGGING_DOC_ID_LIMIT=20
+      - LOGGING_MAX_HISTORY_DAYS=1
+      - LOGGING_QUERY_DSL=
+      - APM_ENABLED=false
+      - APM_ENABLED_API=false
+      - APM_ENVIRONMENT_API=local
+      - APM_LOG_LEVEL_API=INFO
+      - APM_SECRET_TOKEN_API=
+      - APM_SERVER_URL_API=
+      - APM_SERVICE_NAME_API=local-elasticsi-api
+      - AUTH0_PUBLIC_KEY=MIIDDTCCAfWgAwIBAgIJbfeBu+WI8sJGMA0GCSqGSIb3DQEBCwUAMCQxIjAgBgNVBAMTGWVsYXN0aWNzaS0wMS51cy5hdXRoMC5jb20wHhcNMjEwMzA2MTUxNjI0WhcNMzQxMTEzMTUxNjI0WjAkMSIwIAYDVQQDExllbGFzdGljc2ktMDEudXMuYXV0aDAuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu5U0/9jh37OdooDDWJe2fj6Ndg/xqtYXaLSBw6TuA9nAOuXnQ79HwDhcDrJHyqGrxY3VreNWqgbeVLshs47UgAZgEjBfdYF/hAKJWwIDAQABo0IwQDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQhQ/TLAvdrHJmbG1vgb3uMu9UCxTAOBgNVHQ8BAf8EBAMCAoQwDQYJKoZIhvcNAQELBQADggEBAJrIb7mYtzkA7qAYYaICYCql8s9U9sAOZAL61G68P44RpjBHFB5b/tN2gCz+9pZaWCAyaCOsEmuyx0SrlKzMh1QfZbyWoWmAt/cjnLri2HWPsy+6q0JohLXGZ0w7zlQ6cbXHVAooXO6Pg53UD1tLu/1oCIey8Rabgxrdn5I6J9Npri1TRZWJ/D9c8BZfgKU2yQbKKo29oA+2p9bes6a8qAzMhH+quTcDHXtWE72mjpEcA0JvQf8uxkZ4/z3yLxCEf3x8QjeVHtrn1OWrpqJpbKuy9VSynjD0rEw4M1DGQONUILnQRQenvJ3xPtj1AcHA1qxeUhNejtUuxKOXyunuD7Q=
+      - REACT_APP_AUTH0_CLIENT_ID=8i3BoIvR9lpP39luQea9c6smaFBQ7A11
+      - REACT_APP_AUTH0_DOMAIN=elasticsi-01.us.auth0.com
+      - SAAS_ENABLED=false
+      - SAAS_UI_URL=
+      - SMART_SEARCH_API_KEY=6b984a3e-d0e8-44b2-a6d6-c209c6242cf7
+      - SMART_SEARCH_SAAS_URL=
+      - SAAS_AMBERFLO_INGEST_DEPLOYMENT_METER_ENABLED=false
+      - ART_BASE_URL=http://art-engine:9083
+      - ART_ENABLED=false
+      - ART_INTERNAL=true
+      - ART_REDIS_HOST=redis
+      - ART_REDIS_PORT=6379
+      - ART_METARANK_URL=
+      - ML_QUERY_EXPANSION_URL=
+      - ML_QUERY_EXPANSION_TOKEN=
+      - ML_INFERENCE_TOKEN=
+      - HUGGING_FACE_API_TOKEN=
+      - OPEN_AI_API_TOKEN=
+      - IPINFO_TOKEN=
+      - SMARTSEARCH_ENC_SECRET_KEY=${SMARTSEARCH_ENC_SECRET_KEY:-95bee83ac83f3193fe81b7bc75070fc4}
+      - CONVERSATIONAL_API_KEY=
+      - CONVERSATIONAL_API_URL=
+      - CONVERSATIONAL_INDEX=.ss_conversational_search_local
+      - CONVERSATIONAL_HISTORY_INDEX=.ss_conversational_search_history_local
+      - USER_SUPPORT_MODE_ENABLED=false
+      - ACTUATOR_DEFAULT_ENABLED=false
+      - ACTUATOR_ENDPOINT_ALLOWED=health,info,metrics
+      - ACTUATOR_HEALTH_ENABLED=true
+      - ACTUATOR_INFO_ENABLED=true
+      - ACTUATOR_METRICS_ENABLED=true
+      - MANAGEMENT_ENDPOINTS_ENABLED_BY_DEFAULT=false
+      - MANAGEMENT_ENDPOINT_HEALTH_ENABLED=true
+      - MANAGEMENT_ENDPOINT_INFO_ENABLED=true
+      - MANAGEMENT_ENDPOINT_METRICS_ENABLED=true
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+      - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false
+      - MANAGEMENT_HEALTH_REDIS_ENABLED=false
+      - DATA_MANAGEMENT_MAX_FILE_SIZE=2000
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=2000MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=2000MB
+      - AMBERFLO_ENABLED=false
+      - AMBERFLO_API_KEY=disabled
+      - AMBERFLO_SINGLE_PROJECT_ENABLED=false
+      - AMBERFLO_META_PROJECT_ENABLED=false
+      - AMBERFLO_CURATION_ENABLED=false
+      - AMBERFLO_USECASE_ENABLED=false
+      - AMBERFLO_DEPLOYMENT_ENABLED=false
+      - AMBERFLO_QUERY_OPTIMIZATION_ENABLED=false
+      - AMBERFLO_NLP_ENABLE_PROJECT_ENABLED=false
+      - AMBERFLO_CONNECTION_ENABLED=false
+      - AMBERFLO_API_CALLS_ENABLED=false
+      - AMBERFLO_CPU_TRACK_ENABLED=false
+      - AMBERFLO_ELASTIC_COMPUTE_ENABLED=false
+      - AMBERFLO_NLP_DEPLOYMENT_ENABLED=false
+      - AMBERFLO_ART_DEPLOYMENT_ENABLED=false
+      - AMBERFLO_S3_ENABLED=false
+      - AMBERFLO_S3_BUCKET_NAME=disabled
+      - AMBERFLO_S3_SECRET_KEY=disabled
+      - AMBERFLO_S3_ACCESS_KEY=disabled
+      - AMBERFLO_PRODUCT_ID=1
+      - AMBERFLO_PRODUCT_PLAN_ID=disabled
+      - AMBERFLO_SECRET_KEY_TOKEN=disabled
+      - APM_ENABLED_AMBERFLO=false
+      - APM_SERVER_URL_AMBERFLO=
+      - APM_SERVICE_NAME_AMBERFLO=disabled
+      - APM_SECRET_TOKEN_AMBERFLO=
+      - APM_ENVIRONMENT_AMBERFLO=disabled
+      - APM_LOG_LEVEL_AMBERFLO=error
+      - APM_LOG_SENDING_AMBERFLO=false
+      - CDC_DETECTOR_BASE_URL=
+      - CDC_ENCODER_BASE_URL=
+      - CDC_EXECUTOR_BASE_URL=
+      - CDC_ENABLED=false
+      - MONGOCK_ENABLED=false
+      - UPDATE_BY_QUERY_SCROLL=15m
+      - UPDATE_BY_QUERY_SCROLL_SIZE=500
+      - UPDATE_BY_QUERY_SCROLL_SLICING=3
+      - SS_SERVICE_API_KEY=cad14de6-7e37-49d1-84fb-b1109331c211
+      - REPORTS_POLICY_NAME=smartsearch-analytics-ilm-policy
+      - REPORTS_POLICY_MIN_AGE=180d
+      - REPORTS_POLICY_MAX_AGE=30d
+      - REPORTS_POLICY_PRIORITY=100
+      - REPORTS_POLICY_TEMPLATE_NAME=smartsearch-analytics-ilm-policy-template
+      - REPORTS_POLICY_TEMPLATE_INDEX_PATTERN=.smartsearch-analytics-api-logs*
+      - LICENSE_PRODUCT_DATA=${LICENSE_PRODUCT_DATA}
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_MAIN_ALLOW_CIRCULAR_REFERENCES=true
+      - NODE_ENV=production
+    ports:
+      - "9080:9080"
+      - "9081:9081"
+      - "9085:9085"
+    volumes:
+      - ./logs:/app/logs
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  mongodata:
+    driver: local
+  redisdata:
+    driver: local
+  esdata:
+    driver: local
