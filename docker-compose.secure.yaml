@@ -287,6 +287,7 @@ services:
       - "9085:9085"
     volumes:
       - ./logs:/app/logs
+      - ./ServiceOrchestrator.java:/ServiceOrchestrator.java
     read_only: false
     security_opt:
       - no-new-privileges:true
