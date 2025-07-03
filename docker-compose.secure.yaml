@@ -90,7 +90,7 @@ services:
       - ALL
 
   smartsearch-secure:
-    image: weblinktechs2021/elasticsi-search-admin:3.0.7.1
+    image: weblinktechs2021/elasticsi-search-admin:3.0.7
     container_name: smartsearch-secure
     restart: unless-stopped
     depends_on:
