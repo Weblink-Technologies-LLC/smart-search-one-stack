@@ -29,21 +29,20 @@ if [ ! -f secrets/license_product_data.txt ]; then
 fi
 
 if [ ! -f secrets/mongodb_root_password.txt ]; then
-    echo "🔑 Generating MongoDB root password..."
-    openssl rand -base64 32 > secrets/mongodb_root_password.txt
+    echo "🔑 Generating MongoDB root password (URL-safe)..."
+    echo "$(openssl rand -base64 32 | tr -d '+/=' | head -c 16)" > secrets/mongodb_root_password.txt
 fi
 
 if [ ! -f secrets/mongodb_app_password.txt ]; then
-    echo "🔑 Generating MongoDB app password..."
-    openssl rand -base64 32 > secrets/mongodb_app_password.txt
+    echo "🔑 Generating MongoDB app password (URL-safe)..."
+    echo "$(openssl rand -base64 32 | tr -d '+/=' | head -c 16)" > secrets/mongodb_app_password.txt
 fi
 
 if [ ! -f secrets/elastic_password.txt ]; then
-    echo "🔑 Setting Elasticsearch password to default..."
-    echo "Cu5BAieKx8cpD4q" > secrets/elastic_password.txt
+    echo "🔑 Generating Elasticsearch password..."
+    echo "$(openssl rand -base64 32 | tr -d '+/=' | head -c 16)" > secrets/elastic_password.txt
 else
-    echo "🔑 Setting Elasticsearch password to default for consistency..."
-    echo "Cu5BAieKx8cpD4q" > secrets/elastic_password.txt
+    echo "🔑 Using existing Elasticsearch password..."
 fi
 
 echo "✅ All secrets configured"
