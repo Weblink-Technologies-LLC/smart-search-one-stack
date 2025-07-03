@@ -76,7 +76,7 @@ services:
       start_period: 60s
 
   smartsearch-secure:
-    image: weblinktechs2021/elasticsi-search-admin:3.0.7
+    image: weblinktechs2021/ss-one-stack:secure-3.0.7-v2
     container_name: smartsearch-secure
     restart: unless-stopped
     depends_on:
