@@ -122,11 +122,10 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-demo-jwt-secret-key-for-testing-only-32chars-long}
       - JWT_EXPIRATION_TIME=3600
       - PASSWORD_ENC_SECRET_KEY=${PASSWORD_ENCRYPTION_KEY:-demo-password-encryption-key-32chars-long-secure}
-      - LICENSE_TYPE=properties
       - LICENSE_PRODUCT_ID=d2981e21-8fde-452f-923f-c1cd3494752a
       - LICENSE_KEY=6F6D6B-04BBC3-42C89C-ED6648-2544E7-A1EAB1
       - LICENSE_OFFLINE_ACTIVATION=true
-      - LICENSE_ON_PREMISE_URL=
+      - LICENSE_ON_PREMISE_URL=http://localhost:9080
       - LICENSE_USER_ID=6311efff141df767e6a208b6
       - LICENSE_USER_PLAN=STANDARD_WITH_NLP
       - LICENSE_USER_PLAN_ID=
