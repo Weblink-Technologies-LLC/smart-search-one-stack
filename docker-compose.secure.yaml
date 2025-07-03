@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_PASSWORD: SecureMongoPass2024
       MONGO_INITDB_DATABASE: ss-test-onestack
     volumes:
       - mongodata:/data/db
@@ -100,8 +100,8 @@ services:
       - INTERNAL_SEARCH_ENGINE_URL=http://elasticsearch-secure:9200
       - INTERNAL_SEARCH_ENGINE_USERNAME=elastic
       - INTERNAL_SEARCH_ENGINE_VERSION=8.14.3
-      - MONGODB_URI=mongodb://root:${MONGODB_ROOT_PASSWORD}@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
-      - SPRING_DATA_MONGODB_URI=mongodb://root:${MONGODB_ROOT_PASSWORD}@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://root:SecureMongoPass2024@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
+      - SPRING_DATA_MONGODB_URI=mongodb://root:SecureMongoPass2024@mongodb-secure:27017/ss-test-onestack?authSource=admin&retryWrites=true&w=majority
       - MONGODB_ADMIN_DATABASE=ss-test-onestack
       - MONGODB_ELASTICSI_ADMIN_DATABASE=ss-test-onestack
       - SPRING_DATA_MONGODB_DATABASE=ss-test-onestack
@@ -122,6 +122,7 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-demo-jwt-secret-key-for-testing-only-32chars-long}
       - JWT_EXPIRATION_TIME=3600
       - PASSWORD_ENC_SECRET_KEY=${PASSWORD_ENCRYPTION_KEY:-demo-password-encryption-key-32chars-long-secure}
+      - LICENSE_TYPE=properties
       - LICENSE_PRODUCT_ID=d2981e21-8fde-452f-923f-c1cd3494752a
       - LICENSE_KEY=6F6D6B-04BBC3-42C89C-ED6648-2544E7-A1EAB1
       - LICENSE_OFFLINE_ACTIVATION=true

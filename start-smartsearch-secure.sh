@@ -28,15 +28,6 @@ if [ ! -f secrets/license_product_data.txt ]; then
     echo "demo-license-data-$(date +%s)" > secrets/license_product_data.txt
 fi
 
-if [ ! -f secrets/mongodb_root_password.txt ]; then
-    echo "🔑 Generating MongoDB root password (URL-safe)..."
-    echo "$(openssl rand -base64 32 | tr -d '+/=' | head -c 16)" > secrets/mongodb_root_password.txt
-fi
-
-if [ ! -f secrets/mongodb_app_password.txt ]; then
-    echo "🔑 Generating MongoDB app password (URL-safe)..."
-    echo "$(openssl rand -base64 32 | tr -d '+/=' | head -c 16)" > secrets/mongodb_app_password.txt
-fi
 
 if [ ! -f secrets/elastic_password.txt ]; then
     echo "🔑 Generating Elasticsearch password..."
@@ -58,12 +49,10 @@ docker network create smartsearch-backend --internal 2>/dev/null || true
 
 echo "🔧 Setting environment variables from secrets..."
 export ELASTIC_PASSWORD=$(cat secrets/elastic_password.txt)
-export MONGODB_ROOT_PASSWORD=$(cat secrets/mongodb_root_password.txt)
 export JWT_SECRET_KEY=$(cat secrets/jwt_secret.txt)
 export PASSWORD_ENCRYPTION_KEY=$(cat secrets/password_encryption_key.txt)
 export AWS_CREDENTIALS_SECRET_KEY=$(cat secrets/aws_secret_key.txt)
 export AWS_CREDENTIALS_ACCESS_KEY="demo-access-key-for-testing-only"
-export LICENSE_PRODUCT_DATA=$(cat secrets/license_product_data.txt)
 export SMARTSEARCH_ENC_SECRET_KEY="95bee83ac83f3193fe81b7bc75070fc4"
 
 echo "🚀 Starting services..."

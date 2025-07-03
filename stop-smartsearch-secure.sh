@@ -10,10 +10,6 @@ if [ -f secrets/elastic_password.txt ]; then
     export ELASTIC_PASSWORD=$(cat secrets/elastic_password.txt)
 fi
 
-if [ -f secrets/mongodb_root_password.txt ]; then
-    export MONGODB_ROOT_PASSWORD=$(cat secrets/mongodb_root_password.txt)
-fi
-
 if [ -f secrets/jwt_secret.txt ]; then
     export JWT_SECRET_KEY=$(cat secrets/jwt_secret.txt)
 fi
@@ -24,10 +20,6 @@ fi
 
 if [ -f secrets/aws_secret_key.txt ]; then
     export AWS_CREDENTIALS_SECRET_KEY=$(cat secrets/aws_secret_key.txt)
-fi
-
-if [ -f secrets/license_product_data.txt ]; then
-    export LICENSE_PRODUCT_DATA=$(cat secrets/license_product_data.txt)
 fi
 
 export AWS_CREDENTIALS_ACCESS_KEY="demo-access-key-for-testing-only"
