@@ -135,8 +135,8 @@ public class ServiceOrchestrator {
         System.out.println("🔍 Testing Elasticsearch connectivity at: " + elasticUrl);
         System.out.println("   Using credentials: " + elasticUsername + " / " + (elasticPassword != null ? elasticPassword.substring(0, Math.min(4, elasticPassword.length())) + "..." : "null"));
         
-        int maxAttempts = 30;
-        int attemptDelay = 3000; // 3 seconds between attempts
+        int maxAttempts = 40;
+        int attemptDelay = 4000; // 4 seconds between attempts
         boolean elasticsearchReady = false;
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -225,16 +225,16 @@ public class ServiceOrchestrator {
                 }
             }
             
-            System.out.println("⏳ Adding 25-second buffer for complete Elasticsearch internal readiness...");
-            Thread.sleep(25000);
+            System.out.println("⏳ Adding 35-second buffer for complete Elasticsearch internal readiness...");
+            Thread.sleep(35000);
             System.out.println("✅ Elasticsearch is fully ready for search-admin service startup");
         } else {
             System.err.println("⚠️  WARNING: Elasticsearch did not become ready after " + maxAttempts + " attempts");
             System.err.println("   Total wait time: " + (maxAttempts * attemptDelay / 1000) + " seconds");
             System.err.println("   Proceeding with search-admin startup, but it may fail during Elasticsearch registration");
             
-            System.out.println("⏳ Adding 45-second safety buffer for potential Elasticsearch readiness...");
-            Thread.sleep(45000);
+            System.out.println("⏳ Adding 60-second safety buffer for potential Elasticsearch readiness...");
+            Thread.sleep(60000);
             System.out.println("⚠️  Search-admin startup proceeding despite Elasticsearch connectivity issues");
         }
     }
