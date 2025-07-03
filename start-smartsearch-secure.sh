@@ -106,15 +106,51 @@ fi
 
 echo ""
 echo "⏳ STAGE 4: Waiting for Elasticsearch to be ready..."
-for i in {1..20}; do
+echo "   Testing connectivity with enhanced checks for search-admin compatibility..."
+
+ELASTICSEARCH_READY=false
+for i in {1..30}; do
     if curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" >/dev/null 2>&1; then
-        echo "✅ Elasticsearch is ready"
-        break
+        echo "✅ Elasticsearch basic connectivity successful (attempt $i/30)"
+        
+        HEALTH_STATUS=$(curl -s -u "elastic:${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "unknown")
+        echo "   Cluster health status: $HEALTH_STATUS"
+        
+        if [ "$HEALTH_STATUS" = "green" ] || [ "$HEALTH_STATUS" = "yellow" ]; then
+            echo "✅ Elasticsearch cluster is healthy and ready for search-admin registration"
+            ELASTICSEARCH_READY=true
+            break
+        else
+            echo "⏳ Waiting for cluster to reach healthy status... (current: $HEALTH_STATUS)"
+        fi
     else
-        echo "⏳ Waiting for Elasticsearch... (attempt $i/20)"
-        sleep 3
+        echo "⏳ Waiting for Elasticsearch basic connectivity... (attempt $i/30)"
     fi
+    sleep 3
 done
+
+if [ "$ELASTICSEARCH_READY" = "true" ]; then
+    echo ""
+    echo "🔍 STAGE 4.5: Additional Elasticsearch readiness verification..."
+    echo "   Ensuring internal search engine registration will succeed..."
+    
+    for j in {1..5}; do
+        if curl -s -u "elastic:${ELASTIC_PASSWORD}" -X GET "http://localhost:9200/_cat/indices" >/dev/null 2>&1; then
+            echo "✅ Elasticsearch index operations ready (verification $j/5)"
+            break
+        else
+            echo "⏳ Waiting for index operations readiness... (verification $j/5)"
+            sleep 2
+        fi
+    done
+    
+    echo "⏳ Adding 20-second buffer for internal Elasticsearch readiness..."
+    sleep 20
+    echo "✅ Elasticsearch is fully ready for search-admin service startup"
+else
+    echo "⚠️  WARNING: Elasticsearch did not reach healthy status after 90 seconds"
+    echo "   Proceeding with startup but search-admin may fail during registration"
+fi
 
 echo ""
 echo "⏳ STAGE 5: Waiting for Redis to be ready..."
