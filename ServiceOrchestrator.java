@@ -34,9 +34,11 @@ public class ServiceOrchestrator {
             
             while (true) {
                 Thread.sleep(5000); // Check every 5 seconds
+                boolean allRunning = true;
                 for (int i = 0; i < processes.size(); i++) {
                     Process process = processes.get(i);
                     if (!process.isAlive()) {
+                        allRunning = false;
                         String serviceName = (i == 0) ? "SEARCH-ADMIN" : (i == 1) ? "SEARCH-API" : "UTIL-SERVICES";
                         String workDir = (i == 0) ? "/search-admin" : (i == 1) ? "/search-api" : "/smart-search-util";
                         String jarFile = (i == 0) ? "search-admin-3.0.7-SNAPSHOT.jar" : (i == 1) ? "smart-search-api-3.0.7-SNAPSHOT.jar" : "smart-search-util-3.0.7-SNAPSHOT.jar";
@@ -59,6 +61,10 @@ public class ServiceOrchestrator {
                             System.exit(1);
                         }
                     }
+                }
+                
+                if (allRunning) {
+                    break; // Exit monitoring loop when all services are stable
                 }
             }
             

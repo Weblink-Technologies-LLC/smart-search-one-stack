@@ -182,10 +182,24 @@ done
 
 echo ""
 echo "🎯 STAGE 6: Starting Smart Search Application..."
-echo "   Now that MongoDB authentication and Redis are confirmed working"
-echo "   Using updated ServiceOrchestrator with enhanced Elasticsearch timing"
+echo "   Now that MongoDB authentication, Elasticsearch, and Redis are confirmed working"
+echo "   Using staged startup to prevent MongoDB authentication timing issues"
 
-docker compose -f docker-compose.secure.yaml up -d smartsearch-secure
+echo "🔧 Starting infrastructure services first..."
+docker compose -f docker-compose.secure.yaml up mongodb redis elasticsearch -d
+
+echo "⏳ Waiting for MongoDB to be healthy and testing authentication..."
+for i in {1..30}; do
+    if docker exec mongodb-secure mongosh admin --eval "db.auth('root', 'SecureMongoPass2024')" 2>/dev/null | grep -q "{ ok: 1 }"; then
+        echo "✅ MongoDB authentication confirmed working (attempt $i/30)"
+        break
+    fi
+    echo "⏳ Waiting for MongoDB authentication... (attempt $i/30)"
+    sleep 2
+done
+
+echo "🚀 Starting Smart Search application now that MongoDB is confirmed ready..."
+docker compose -f docker-compose.secure.yaml up smartsearch-secure -d
 
 echo ""
 echo "⏳ STAGE 7: Waiting for Smart Search application to start..."
